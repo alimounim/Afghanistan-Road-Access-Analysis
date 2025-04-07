@@ -1,0 +1,667 @@
+---
+title: "Afghanistan"
+format: html
+editor: visual
+author: Ali Mounim Rajabi
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Afghanistan
+
+# ![](https://dumbledorespeacemakers.wordpress.com/wp-content/uploads/2010/11/road_network.jpg)
+
+## Introduction and motivation
+
+Afghanistan is a land of breathtaking beauty, with its majestic Hindu Kush and Pamir mountains shaping the landscape. However, this rugged terrain creates significant challenges for its people. The towering mountains make it incredibly difficult for families to reach different provinces, especially in emergencies when access to healthcare is critical. Many communities remain isolated, cut off from the services and opportunities they desperately need. During winter, when snow and harsh weather add to the barriers, these mountains become even more formidable, trapping people in their villages and making it nearly impossible to travel.
+
+The situation is made worse by the lack of a reliable transportation system. Afghanistan's highways and roads are often in poor condition, with many areas lacking proper infrastructure altogether. For many Afghans, this means long, tough journeys over rough and dangerous roads to reach schools, markets, or medical facilities. In this project, I am working to map and analyze the transportation networks across Afghanistan. By creating detailed, interactive maps, I hope to highlight the most critical areas in need of development. My goal is to support efforts to build better roads and highways, which can connect communities, foster economic growth, and ultimately improve the lives of the Afghan people.
+
+### Libararies
+
+```{r}
+#install.packages(c("terra", "geodata", "rnaturalearth", "ggplot2", "tidyverse", "devtools", "sf", "tidyterra", "tmap", "ggspatial"))
+library(terra)
+library(geodata)
+library(rnaturalearth)
+library(ggplot2)
+library(tidyverse)
+library(devtools)
+library(sf)
+library(tidyterra)
+library(tmap)
+library(ggspatial)
+library(tigris)
+library(stringr)
+library(shiny)
+library(leaflet)
+library(exactextractr)
+library(geojsonsf)
+library(osmdata)
+library(stringr)
+library(readr)
+```
+
+### **Country Boundaries Maps**
+
+```{r}
+wgs84 <- "init=EPSG:4326"
+# Create required vector layer
+
+
+```
+
+#### Country Boundary
+
+```{r}
+# Get country boundaries data
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Filter boundaries data for Afghanistan
+afghanistan <- world[world$iso_a3 == "AFG", ]
+
+# Plot the map
+afg_map <- ggplot() +
+  geom_sf(data = afghanistan, fill = "lightblue", color = "black") +
+  ggtitle("Afghanistan Boundaries Map")
+
+afg_map
+
+# Save a png image of the map above
+ggsave("afg_map.png", width =  40, height = 20 , units = "cm", bg = "White")
+```
+
+#### Region Boundaries
+
+```{r}
+# Regions boundaries
+afg_regions <- st_read("Afghanistan_Regions/afg_admbnda_region_stats.shp")
+
+# Ensure the column name for province names is correctly specified
+region_name_column <- 'reg_en'
+
+# Calculate the centroid or a point on the surface of each province for placing the labels
+afg_region_points <- st_point_on_surface(afg_regions)
+
+# Ensure the points include the province names
+afg_district_points <- cbind(afg_region_points, afg_regions[region_name_column])
+
+# Plot province boundaries with names
+afg_region_map <- ggplot() +
+  geom_sf(data = afg_regions, fill = "lightblue", color = "black") +
+  geom_sf_text(data = afg_region_points, aes(label = get(region_name_column)), size = 3, color = "red") +
+  ggtitle("Afghanistan Regions Boundaries") +
+  theme_minimal()
+
+afg_region_map
+
+# Save a png image of the map above
+ggsave("afg_region_map.png", width =  40, height = 20 , units = "cm", bg = "White")
+```
+
+#### Province Boundaries
+
+```{r}
+# Province boundaries
+afg_province <- st_read("sdr_subnational_boundaries.shp")
+
+# Adding the Abbrevaitions for Provinces
+afg_province$Abbr <- substr(afg_province$DHSREGEN, 1, 3)
+afg_province$Abbr <- toupper(afg_province$Abbr)
+
+# Ensure the column name for province names is correctly specified
+province_name_column <- 'Abbr'
+
+# Calculate the centroid or a point on the surface of each province for placing the labels
+afg_province_points <- st_point_on_surface(afg_province)
+
+# Ensure the points include the province names
+afg_province_points <- cbind(afg_province_points, afg_province[province_name_column])
+
+# Plot province boundaries with names
+afg_province_map <- ggplot() +
+  geom_sf(data = afg_province, fill = "lightblue", color = "black") +
+  geom_sf_text(data = afg_province_points, aes(label = get(province_name_column)), size = 3, color = "red") +
+  ggtitle("Afghanistan Province Boundaries") +
+  theme_minimal()
+afg_province_map
+
+
+# Save a png image of the map above
+ggsave("afg_province_map.png", width =  40, height = 20 , units = "cm", bg = "White")
+```
+
+#### District Boundaries
+
+```{r}
+# District boundaries
+afg_district <- st_read("Afghanistan_Districts/Afghanistan_Districts.shp")
+
+# Ensure the column name for province names is correctly specified
+district_name_column <- 'DIST_34_NA'
+
+# Calculate the centroid or a point on the surface of each province for placing the labels
+afg_district_points <- st_point_on_surface(afg_district)
+
+# Ensure the points include the province names
+afg_district_points <- cbind(afg_district_points, afg_district[district_name_column])
+
+# Plot province boundaries with names
+afg_districts_map <- ggplot() +
+  geom_sf(data = afg_district, fill = "lightblue", color = "black") +
+  #geom_sf_text(data = afg_district_points, aes(label = get(district_name_column)), size = 3, color = "red") +
+  ggtitle("Afghanistan District Boundaries") +
+  theme_minimal()
+
+afg_districts_map
+
+# Save a png image of the map above
+ggsave("afg_districts_map.png", width =  40, height =  20, units = "cm", bg = "White")
+```
+
+### Geographic Features
+
+#### Rivers On Provinces
+
+```{r}
+# Rivers Data
+afg_river <- st_read("afg_river_major_lin.shp")
+
+# Plot rivers
+ggplot() +
+   geom_sf(data = afg_province, fill = NA, color = "black") +
+  geom_sf(data = afg_river, color = "blue") +
+  ggtitle("Afghanistan Major Rivers")
+```
+
+#### Mountains
+
+```{r}
+# Mountain Data
+elev_afg <- elevation_30s(country = "Afghanistan", path = tempdir())
+
+# Plot Mountains
+plot(elev_afg)
+```
+
+#### Roads
+
+```{r}
+# Road Data
+afg_roads <- st_read("hotosm_afg_roads_lines_shp.shp")
+# tmap Plot Roads
+#tmap_mode("view")
+tm_shape(afg_district) +
+  tm_borders() +
+  tm_shape(afg_roads) +
+  tm_lines(col = "red") +
+  tm_layout(title = "Road Networks in Afghanistan")
+```
+
+### Social Indicators
+
+##### Population Across Regions
+
+```{r}
+afg_pop_province <-st_read("Population - Province/afg_admbnda_adm1_pop.shp")
+# Aggregate population by region
+region_population <- afg_pop_province %>%
+  group_by(reg_en) %>%
+  summarise(pop = sum(pop))
+
+# Inspect the aggregated data
+print(region_population)
+
+# interactive Map
+tmap_mode("view")
+# Create the tmap plot with district names in the popup
+tm_shape(afg_regions) +
+  tm_borders() +
+  tm_shape(region_population) + 
+  tm_fill(col = "pop",  # Use the population column for coloring
+          style = "quantile",  # Style can be "quantile", "jenks", "pretty", etc.
+          palette = "Blues",   # Color palette, can be "Blues", "Reds", etc.
+          title = "Population",
+          popup.vars = c("Population" = "pop")) +  # Show district name on click
+  tm_borders()  # Add borders to the population polygons
+```
+
+##### Population Across Provinces
+
+```{r}
+# Population based on Province Data
+afg_pop_province <- st_read("Population - Province/afg_admbnda_adm1_pop.shp")
+
+# transform the afg_pop_province
+afg_pop_province <- st_transform(afg_pop_province, crs =  4326)
+
+# interactive Map
+tmap_mode("view")
+# Create the tmap plot with district names in the popup
+tm_shape(afg_province) +
+  tm_borders() +
+  tm_shape(afg_pop_province) + 
+  tm_fill(col = "pop",  # Use the population column for coloring
+          style = "quantile",  # Style can be "quantile", "jenks", "pretty", etc.
+          palette = "Blues",   # Color palette, can be "Blues", "Reds", etc.
+          title = "Population",
+          popup.vars = c("Province Name" = "adm1_en")) +  # Show district name on click
+  tm_borders()  # Add borders to the population polygons
+```
+
+##### Population Across Districts
+
+```{r}
+# Population based on District Data
+afg_pop_district <- st_read("Population - District Level/afg_admbnda_adm2_pop.shp")
+# transforming the afg_pop_district to Wgs84
+afg_pop_district <- st_transform(afg_pop_district, crs = 4326)
+
+# interactive map
+tmap_mode("view")
+# Create the tmap plot with district names in the popup
+tm_shape(afg_district) +
+  tm_borders() +
+  tm_shape(afg_pop_district) + 
+  tm_fill(col = "pop",  # Use the population column for coloring
+          style = "quantile",  # Style can be "quantile", "jenks", "pretty", etc.
+          palette = "Blues",   # Color palette, can be "Blues", "Reds", etc.
+          title = "Population",
+          popup.vars = c("District Name" = "adm2_en")) +  # Show district name on click
+  tm_borders() + # Add borders to the population polygons
+tm_layout(title = "Population across Districts")
+```
+
+### Facilities
+
+#### Education Facilities
+
+```{r}
+# Education Data
+afg_education_fac <- st_read("afg_education_facilities_polygons_shp/hotosm_afg_education_facilities_polygons_shp.shp")
+
+# setting the crs of the educational facilities the same of rivers
+afg_education_fac <- afg_education_fac %>% st_set_crs(st_crs(afg_river))
+
+# Convert educational facilities polygons to points (centroids)
+afg_education_fac_points <- st_centroid(afg_education_fac)
+
+# tmap of the educational facilities
+tmap_mode("view")
+tm_shape(afg_district)+
+  tm_borders()+
+  tm_shape(afg_education_fac)+
+    tm_dots("red")
+tm_layout(title = "Educational Facilities In Afghanistan")
+
+```
+
+#### Health Facilities
+
+```{r}
+# Health Facilities Data
+afg_health_fac <- st_read("afg_hltfac.shp")
+
+# transforming Data to Wgs84
+st_crs(afg_health_fac, crs(afg_district))
+
+# Aggregate population by region
+health_fac_district <- afg_health_fac %>%
+  group_by(dist_na_en) %>% 
+  summarise(facility_count = n())
+
+# Inspect the aggregated data
+print(health_fac_district)
+
+
+# tmap
+tmap_mode("view")
+tm_shape(afg_district)+
+  tm_borders()+
+  tm_shape(afg_health_fac$geometry)+
+    tm_dots("red") + 
+  tm_layout(title = "Health Facilities across Districts")
+```
+
+#### Health Facilities Hirat
+
+```{r}
+# Subset only the districts in Hirat
+Hirat_districts <- afg_district %>%
+  filter(PROV_34_NA == "Hirat") # Replace `province_name` with the actual column name that identifies Hirat province
+Hirat_districts <- st_transform(Hirat_districts, crs = 4326)
+
+
+Hirat_health_fac <- afg_health_fac %>% 
+  filter(prov_na_en == "Hirat")
+
+Hirat_health_fac <- st_transform(Hirat_health_fac, crs = 4326)
+# Subset only the health facilities within the Hirat districts
+Hirat_health_fac <- st_intersection(afg_health_fac, Hirat_districts)
+
+# Inspect the aggregated data for Hirat
+Hirat_health_fac_district <- Hirat_health_fac %>%
+  group_by(dist_na_en) %>% 
+  summarise(facility_count = n())
+
+print(Hirat_health_fac_district)
+
+# Create the tmap
+tmap_mode("view")
+
+tm_shape(Hirat_districts) +
+  tm_borders() +
+  tm_shape(Hirat_health_fac$geometry) +
+  tm_dots(col = "red") 
+  tm_layout(title = "Health Facilities in Hirat Districts")
+```
+
+#### Health Facilities Kabul
+
+```{r}
+# Subset only the districts in Kabul
+kabul_districts <- afg_district %>%
+  filter(PROV_34_NA == "Kabul") # Replace `province_name` with the actual column name that identifies Kabul province
+kabul_districts <- st_transform(kabul_districts, crs = 4326)
+
+
+Kabul_health_fac <- afg_health_fac %>% 
+  filter(prov_na_en == "Kabul")
+
+Kabul_health_fac <- st_transform(Kabul_health_fac, crs = 4326)
+# Subset only the health facilities within the Kabul districts
+Kabul_health_fac <- st_intersection(afg_health_fac, kabul_districts)
+
+# Inspect the aggregated data for Kabul
+Kabul_health_fac_district <- Kabul_health_fac %>%
+  group_by(dist_na_en) %>% 
+  summarise(facility_count = n())
+
+print(Kabul_health_fac_district)
+
+# Create the tmap
+tmap_mode("view")
+
+tm_shape(kabul_districts) +
+  tm_borders() +
+  tm_shape(kabul_health_fac$geometry) +
+  tm_dots(col = "red") 
+  tm_layout(title = "Health Facilities in Hirat Districts")
+  
+```
+
+#### Health Facilities Nuristan
+
+```{r}
+# Subset only the districts in Nuristan
+Nuristan_districts <- afg_district %>%
+  filter(PROV_34_NA == "Nuristan") # Replace `province_name` with the actual column name that identifies Nuristan province
+Nuristan_districts <- st_transform(Nuristan_districts, crs = 4326)
+
+
+Nuristan_health_fac <- afg_health_fac %>% 
+  filter(prov_na_en == "Nuristan")
+
+Nuristan_health_fac <- st_transform(Nuristan_health_fac, crs = 4326)
+# Subset only the health facilities within the Kabul districts
+Nuristan_health_fac <- st_intersection(afg_health_fac, Nuristan_districts)
+
+# Inspect the aggregated data for Kabul
+Nuristan_health_fac_district <- Nuristan_health_fac %>%
+  group_by(dist_na_en) %>% 
+  summarise(facility_count = n())
+
+print(Nuristan_health_fac_district)
+
+# Create the tmap
+tmap_mode("view")
+
+tm_shape(Nuristan_districts) +
+  tm_borders() +
+  tm_shape(Nuristan_health_fac$geometry) +
+  tm_dots(col = "red") 
+  tm_layout(title = "Health Facilities in Nuristan Districts")
+```
+
+```{r}
+afg_health_access_time <- st_read("afg_capa_hltfac_tierall.shp")
+
+# extracting the the hours as numeric field from the strings in afg_health_access
+afg_health_access_timehr <- afg_health_access_time %>% mutate(time = parse_number(time))
+
+# Transform to WGS84 if not already in that CRS
+afg_health_access_timehr <- st_transform(afg_health_access_timehr, crs = 4326)
+
+# Ensure geometries are valid
+afg_district <- st_make_valid(afg_district)
+afg_health_access_timehr <- st_make_valid(afg_health_access_timehr)
+
+# Set tmap options to check and fix invalid polygons
+tmap_options(check.and.fix = TRUE)
+
+# Switch to view mode
+tmap_mode("view")
+
+# Create the tmap
+tm_shape(afg_health_access_timehr) +
+  tm_polygons(col = "time",  # Use the extracted time column for coloring
+              palette = "YlOrRd",  # Color palette
+              title = "Access Time (hours)",
+              alpha = 0.7,  # Transparency
+              popup.vars = c("Facility Name" = "facilities", "Access Time" = "time")) +  # Show facility name and access time on click
+  tm_layout(title = "Health Facilities Access Time in Afghanistan",
+            legend.outside = TRUE) +
+  tm_shape(afg_district) +
+  tm_borders(lwd = 1, col = "white") +
+  tm_shape(afg_district) +
+  tm_polygons(border.col = "white", alpha = 0,  # Ensure borders are visible
+              popup.vars = c("District Name" = "DIST_34_NA"))
+
+
+```
+
+### Leaflet Maps
+
+#### Kabul Leaflet Map
+
+```{r}
+
+# Inspect the aggregated data for Kabul
+kabul_health_fac_district <- kabul_health_fac %>%
+  group_by(dist_na_en) %>%
+  summarise(facility_count = n())
+
+print(kabul_health_fac_district)
+
+# Initialize the leaflet map
+kabul_map <- leaflet() %>%
+  addTiles() %>%
+  addControl("Health Facilities in Kabul Districts", position = "topright")
+
+# Add district boundaries to the map
+kabul_map <- kabul_map %>%
+  addPolygons(data = kabul_districts, color = "black", weight = 2, fillColor = "lightblue", fillOpacity = 0.5,
+              group = "Kabul Districts", label = ~DIST_34_NA, popup = ~DIST_34_NA)
+
+# Convert MULTIPOINT to POINT if necessary
+kabul_health_fac <- st_cast(kabul_health_fac, "POINT")
+
+# Add health facilities to the map
+kabul_map <- kabul_map %>%
+  addCircles(data = kabul_health_fac, color = "red", weight = 1, fillColor = "red", fillOpacity = 0.5,
+             group = "Health Facilities", label = ~facility_n, popup = ~facility_n)
+
+# Add the layers control
+kabul_map <- kabul_map %>%
+  addLayersControl(
+    overlayGroups = c("Kabul Districts", "Health Facilities"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+# Display the map
+kabul_map
+```
+
+#### Hirat Leaflet Map
+
+```{r}
+# Inspect the aggregated data for Hirat
+Hirat_health_fac_district <- Hirat_health_fac %>%
+  group_by(dist_na_en) %>%
+  summarise(facility_count = n())
+
+print(Hirat_health_fac_district)
+
+# Initialize the leaflet map
+Hirat_map <- leaflet() %>%
+  addTiles() %>%
+  addControl("Health Facilities in Hirat Districts", position = "topright")
+
+# Add district boundaries to the map
+Hirat_map <- Hirat_map %>%
+  addPolygons(data = Hirat_districts, color = "black", weight = 2, fillColor = "lightblue", fillOpacity = 0.5,
+              group = "Kabul Districts", label = ~DIST_34_NA, popup = ~DIST_34_NA)
+
+# Convert MULTIPOINT to POINT if necessary
+Hirat_health_fac <- st_cast(Hirat_health_fac, "POINT")
+
+# Add health facilities to the map
+Hirat_map <- Hirat_map %>%
+  addCircles(data = Hirat_health_fac, color = "red", weight = 1, fillColor = "red", fillOpacity = 0.5,
+             group = "Health Facilities", label = ~facility_n, popup = ~facility_n)
+
+# Add the layers control
+Hirat_map <- Hirat_map %>%
+  addLayersControl(
+    overlayGroups = c("Hirat Districts", "Health Facilities"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+# Display the map
+Hirat_map
+```
+
+#### Nuristan Leaflet Map
+
+```{r}
+# Inspect the aggregated data for Nuristan
+Nuristan_health_fac_district <- Nuristan_health_fac %>%
+  group_by(dist_na_en) %>%
+  summarise(facility_count = n())
+
+print(Nuristan_health_fac_district)
+
+# Initialize the leaflet map
+Nuristan_map <- leaflet() %>%
+  addTiles() %>%
+  addControl("Health Facilities in Nuristan Districts", position = "topright")
+
+# Add district boundaries to the map
+Nuristan_map <- Nuristan_map %>%
+  addPolygons(data = Nuristan_districts, color = "black", weight = 2, fillColor = "lightblue", fillOpacity = 0.5,
+              group = "Nuristan Districts", label = ~DIST_34_NA, popup = ~DIST_34_NA)
+
+# Convert MULTIPOINT to POINT if necessary
+Nuristan_health_fac <- st_cast(Nuristan_health_fac, "POINT")
+
+# Add health facilities to the map
+Nuristan_map <- Nuristan_map %>%
+  addCircles(data = Nuristan_health_fac, color = "red", weight = 1, fillColor = "red", fillOpacity = 0.5,
+             group = "Health Facilities", label = ~facility_n, popup = ~facility_n)
+
+# Add the layers control
+Nuristan_map <- Nuristan_map %>%
+  addLayersControl(
+    overlayGroups = c("Nuristan Districts", "Health Facilities"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+# Display the map
+Nuristan_map
+```
+
+### Afghanistan Leaflet Map
+
+```{r}
+# Initialize the leaflet map
+afg_map <- leaflet() %>%
+  addTiles() %>%
+  addControl("Afghanistan Map", position = "topright")
+
+# Add country boundary to the map
+afg_map <- afg_map %>%
+  addPolygons(data = afghanistan, color = "blue", weight = 1, fillColor = "lightblue", fillOpacity = 0.5, 
+              group = "Country Boundary", label = ~name, popup = ~name)
+
+# Add region boundaries to the map
+afg_map <- afg_map %>%
+  addPolygons(data = afg_regions, color = "black", weight = 1, fillColor = "lightblue", fillOpacity = 0.5, 
+              group = "Region Boundaries", label = ~reg_en, popup = ~reg_en)
+
+# Add province boundaries to the map
+afg_map <- afg_map %>%
+  addPolygons(data = afg_province, color = "black", weight = 1, fillColor = "lightblue", fillOpacity = 0.5, 
+              group = "Province Boundaries", label = ~Abbr, popup = ~Abbr)
+
+# Add district boundaries to the map
+afg_map <- afg_map %>%
+  addPolygons(data = afg_district, color = "black", weight = 1, fillColor = "lightblue", fillOpacity = 0.5, 
+              group = "District Boundaries", label = ~DIST_34_NA, popup = ~DIST_34_NA)
+
+# Add rivers to the map
+afg_map <- afg_map %>%
+  addPolylines(data = afg_river, color = "blue", weight = 1, group = "Rivers", label = ~Name, popup = ~Name)
+
+# Add roads to the map
+afg_map <- afg_map %>%
+ addPolylines(data = afg_roads, color = "brown", weight = 1, group = "Roads", label = ~name_en, popup = ~name_en)
+
+# Add educational facilities to the map
+afg_map <- afg_map %>%
+  addCircles(data = afg_education_fac_points, color = "green", weight = 1, fillColor = "green", fillOpacity = 0.5, 
+             group = "Educational Facilities", label = ~name, popup = ~name)
+
+# Add health facilities to the map
+afg_map <- afg_map %>%
+  addCircles(data = afg_health_fac, color = "red", weight = 1, fillColor = "red", fillOpacity = 0.5, 
+             group = "Health Facilities", label = ~facility_n, popup = ~facility_n)
+
+# Add access time to health facilities to the map
+afg_map <- afg_map %>%
+  addPolygons(data = afg_health_access_timehr, color = "orange", weight = 1, fillColor = "orange", fillOpacity = 0.5, 
+             group = "Health Facilities Access Time", label = ~time, popup = ~time)
+
+# Add the layers control
+afg_map <- afg_map %>%
+  addLayersControl(
+    overlayGroups = c("Country Boundary", "Region Boundaries", "Province Boundaries", "District Boundaries", 
+                      "Rivers", "Roads", "Educational Facilities", "Health Facilities", "Health Facilities Access Time"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+# Display the map
+afg_map
+```
+
+##  Results
+
+After collecting the data, cleaning the data, and mapping the spatial data for Afghanistan, I found that while Afghanistan is mountainous, and mostly the lack of transportation and road network in Afghanistan is explained as a result of its geography, it is not the sole reason for it. During my analysis, I found that some districts in the central and western regions, specifically Kabul and Hirat, have significantly lower access times to health institutions compared to other provinces. After looking into the road network in these two cities and comparing it to other cities, I found that there are significantly more roads built in Kabul and Herat compared to other provinces. While not all provinces have a complete road network, there are some provinces that don't have the base roads needed to commute from one district to another within one province. An example can be Nuristan province.
+
+## References
+
+Humanitarian Spatial Data Center:\
+<https://hsdc.immap.org/landing/?next=/>
+
+ArcGIS Online:
+
+<https://bard.maps.arcgis.com/home/index.html>
+
+Humanitarian Data Exchange
+
+<https://data.humdata.org/group/afg>
+
+Afghanistan Geospatial Analysis:
+
+<https://energypedia.info/images/f/fd/Afghanistan_Geospatial_Analysis_SC.pdf>
